@@ -1,0 +1,49 @@
+
+name: Build WinChat Demo APK
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'winchat.zip.part*'
+      - '.github/workflows/build-apk.yml'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Reassemble source ZIP
+        run: |
+          cat winchat.zip.part* > "$RUNNER_TEMP/winchat-source.zip"
+          unzip -t "$RUNNER_TEMP/winchat-source.zip"
+          mkdir -p "$RUNNER_TEMP/winchat-source"
+          unzip -q "$RUNNER_TEMP/winchat-source.zip" -d "$RUNNER_TEMP/winchat-source"
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Build APK
+        working-directory: ${{ runner.temp }}/winchat-source
+        run: |
+          flutter pub get
+          flutter build apk --release
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: WinChat-Demo-APK
+          path: ${{ runner.temp }}/winchat-source/build/app/outputs/flutter-apk/app-release.apk
+          if-no-files-found: error
+          retention-days: 7
