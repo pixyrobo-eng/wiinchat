@@ -33,6 +33,10 @@ jobs:
         with:
           channel: stable
           cache: true
+          
+      - name: Disable AGP 9 new DSL
+        run: |
+          echo "android.newDsl=false" >> "$RUNNER_TEMP/winchat-source/android/gradle.properties"
 
       - name: Build APK
         working-directory: ${{ runner.temp }}/winchat-source
