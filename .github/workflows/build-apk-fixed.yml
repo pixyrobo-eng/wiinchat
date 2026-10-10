@@ -1,0 +1,63 @@
+name: Build WinChat Demo APK
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'winchat.zip.part*'
+      - '.github/workflows/build-apk.yml'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Reassemble source ZIP
+        shell: bash
+        run: |
+          cat winchat.zip.part* > "$RUNNER_TEMP/winchat-source.zip"
+          unzip -t "$RUNNER_TEMP/winchat-source.zip"
+          mkdir -p "$RUNNER_TEMP/winchat-source"
+          unzip -q "$RUNNER_TEMP/winchat-source.zip" -d "$RUNNER_TEMP/winchat-source"
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.35.7'
+          cache: true
+
+      - name: Prepare standalone demo Android build
+        working-directory: ${{ runner.temp }}/winchat-source
+        shell: bash
+        run: |
+          echo 'android.newDsl=false' >> android/gradle.properties
+          # Keep this demo independent of Firebase configuration.
+          sed -i '/id("com.google.gms.google-services")/d' android/app/build.gradle.kts
+          # Use the debug signing config for a preview APK; no keystore is needed.
+          sed -i '/signingConfig = signingConfigs.getByName("release")/d' android/app/build.gradle.kts
+          # Use an AGP 8 release compatible with the pinned Flutter toolchain.
+          sed -i 's/version "8.12.0"/version "8.9.1"/' android/settings.gradle.kts
+
+      - name: Build release APK
+        working-directory: ${{ runner.temp }}/winchat-source
+        shell: bash
+        run: |
+          flutter --version
+          flutter pub get
+          flutter build apk --release
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: WinChat-Demo-APK
+          path: ${{ runner.temp }}/winchat-source/build/app/outputs/flutter-apk/app-release.apk
+          if-no-files-found: error
+          retention-days: 7
